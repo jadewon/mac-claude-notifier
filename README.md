@@ -64,7 +64,7 @@ make install
 }
 ```
 
-If installed via Homebrew, use `"command": "$(brew --prefix)/bin/notification.sh"` instead.
+If installed via Homebrew, check the path shown in `brew info mac-claude-notifier` and use it as the command value.
 
 The first run will prompt for macOS notification permission — allow it.
 
