@@ -2,6 +2,9 @@
 
 Native macOS notifications for Claude Code. Click to jump back to your terminal.
 
+> **Using Claude Code?** Paste this URL and ask Claude to install it for you:
+> `https://raw.githubusercontent.com/jadewon/mac-claude-notifier/main/INSTALL.md`
+
 ## Why this exists
 
 `osascript`'s `display notification` works but clicking always opens Script Editor — there is no way to configure a different click target. `terminal-notifier` was the standard alternative, but it has not had a release since 2017, relies on the deprecated `NSUserNotificationCenter` API, and is broken on macOS Sequoia and Apple Silicon.
