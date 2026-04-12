@@ -82,6 +82,31 @@ Same as Option B — installs to `~/.claude/hooks/` and prints the hook configur
 
 The first notification triggers a macOS permission prompt. Click **Allow** to enable notifications.
 
+**If the prompt doesn't appear, or notifications aren't showing:**
+
+1. Open **System Settings → Notifications**
+2. Scroll to find **ClaudeNotifier** in the app list
+3. Turn on **Allow notifications**
+4. Set **Alert style** to **Banners** or **Alerts** (not **None**)
+5. Make sure **Focus** / **Do Not Disturb** is off, or allow ClaudeNotifier under Focus settings
+
+**If ClaudeNotifier does not appear in the list at all:**
+
+Trigger the app manually once to register it with macOS:
+
+```bash
+TMPFILE=$(mktemp /tmp/claude-noti-XXXXXX)
+printf '{"message":"permission test","notification_type":"unknown","cwd":"%s"}' "$PWD" > "$TMPFILE"
+
+# Homebrew install:
+open -a "$(brew --prefix)/ClaudeNotifier.app" --args --data "$TMPFILE"
+
+# Source / release install:
+open -a ~/.claude/hooks/ClaudeNotifier.app --args --data "$TMPFILE"
+```
+
+After this, ClaudeNotifier will appear in System Settings → Notifications.
+
 ## Customizing the notification
 
 To change the emoji, title, body, or sound, edit the `format_notification()` function at the top of your installed `notification.sh` — no rebuild required. Saving the file is enough; the next notification picks up the change.

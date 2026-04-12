@@ -95,13 +95,9 @@ For Methods B and C, the path is `$HOME/.claude/hooks/notification.sh` (expand `
 
 Check if any existing hook command references `notification.sh` or `ClaudeNotifier`. If so, update it to the new path. If not, append to the hooks array.
 
-## Step 3: Grant notification permission
+## Step 3: Trigger first notification to register permission
 
-The first notification triggers a macOS permission prompt. Tell the user:
-
-> "The first notification will ask for macOS permission. When you see the prompt, click Allow."
-
-To trigger the permission prompt now:
+Launching the app for the first time registers it with macOS and shows a permission prompt.
 
 ```bash
 TMPFILE=$(mktemp /tmp/claude-noti-XXXXXX)
@@ -118,11 +114,37 @@ open -a "$(brew --prefix)/ClaudeNotifier.app" --args --data "$TMPFILE"
 open -a "$HOME/.claude/hooks/ClaudeNotifier.app" --args --data "$TMPFILE"
 ```
 
-## Step 4: Verify
+Tell the user:
 
-After the user grants permission, confirm:
-- A notification banner appeared
-- Clicking the notification activated their terminal app
+> "A macOS permission prompt should appear. Please click **Allow**. If you don't see it, I'll help you enable it manually in System Settings."
+
+## Step 4: Verify the notification was shown
+
+Ask the user if they saw a notification banner. If YES — skip to Step 5.
+
+If NO, the permission was likely denied or the prompt was missed. Check the logs:
+
+```bash
+/usr/bin/log show --predicate 'processImagePath CONTAINS "ClaudeNotifier" AND eventMessage CONTAINS "authorization"' --last 5m --style compact 2>/dev/null | tail -5
+```
+
+Look for `didGrant: 0 hasError: 1` — this means permission is denied.
+
+**If permission is denied**, guide the user through System Settings:
+
+> "Please open **System Settings → Notifications**, scroll to find **ClaudeNotifier**, and turn on **Allow notifications**. Set Alert style to **Banners** or **Alerts**."
+
+You can open System Settings directly to the Notifications pane:
+
+```bash
+open "x-apple.systempreferences:com.apple.preference.notifications"
+```
+
+After the user confirms they enabled it, re-run the test notification from Step 3 to verify.
+
+## Step 5: Verify click behavior
+
+Ask the user to click the test notification and confirm that it activated their terminal app.
 
 ## Done
 
