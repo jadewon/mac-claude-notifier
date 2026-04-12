@@ -32,5 +32,8 @@ clean:
 	@rm -rf $(BUILD_DIR)
 
 release: build
-	@cd $(BUILD_DIR) && zip -r $(APP_NAME)-v$(VERSION)-macOS.zip $(APP_NAME).app
+	@cp scripts/notification.sh $(BUILD_DIR)/notification.sh
+	@cp scripts/install.sh $(BUILD_DIR)/install.sh
+	@chmod +x $(BUILD_DIR)/notification.sh $(BUILD_DIR)/install.sh
+	@cd $(BUILD_DIR) && zip -r $(APP_NAME)-v$(VERSION)-macOS.zip $(APP_NAME).app notification.sh install.sh
 	@echo "Created $(BUILD_DIR)/$(APP_NAME)-v$(VERSION)-macOS.zip"

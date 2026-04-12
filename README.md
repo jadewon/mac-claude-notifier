@@ -23,31 +23,16 @@ This project is a lightweight replacement built on Apple's modern `UNUserNotific
 | macOS Sequoia+ | Works (limited) | Broken | Works |
 | Dock icon | No | Shows in Dock | No (background app) |
 
-## Quick Start
+## Installation
 
-**Option A — Homebrew**
+### Option A — Homebrew (recommended)
 
 ```bash
 brew tap jadewon/tap
 brew install mac-claude-notifier
 ```
 
-**Option B — Download from GitHub Releases**
-
-```bash
-# Download and unzip the latest release from GitHub Releases, then:
-make install
-```
-
-**Option C — Build from source**
-
-```bash
-git clone https://github.com/jadewon/mac-claude-notifier.git
-cd mac-claude-notifier
-make install
-```
-
-**Add the hook to `~/.claude/settings.json`**
+Then add the hook to `~/.claude/settings.json`:
 
 ```json
 {
@@ -58,7 +43,7 @@ make install
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/notification.sh"
+            "command": "/opt/homebrew/bin/notification.sh"
           }
         ]
       }
@@ -67,9 +52,35 @@ make install
 }
 ```
 
-If installed via Homebrew, check the path shown in `brew info mac-claude-notifier` and use it as the command value.
+> Intel Mac users: replace `/opt/homebrew` with `/usr/local`.
 
-The first run will prompt for macOS notification permission — allow it.
+### Option B — Download pre-built release
+
+1. Download the latest `.zip` from [GitHub Releases](https://github.com/jadewon/mac-claude-notifier/releases)
+2. Unzip and run the installer:
+
+```bash
+unzip ClaudeNotifier-v*.zip
+./install.sh
+```
+
+The installer copies `ClaudeNotifier.app` and `notification.sh` to `~/.claude/hooks/` and prints the settings.json configuration to add.
+
+### Option C — Build from source
+
+Requires Swift 5.9+ (included with Xcode 15+).
+
+```bash
+git clone https://github.com/jadewon/mac-claude-notifier.git
+cd mac-claude-notifier
+make install
+```
+
+Same as Option B — installs to `~/.claude/hooks/` and prints the hook configuration.
+
+### Notification permission
+
+The first notification triggers a macOS permission prompt. Click **Allow** to enable notifications.
 
 ## Configuration
 
@@ -78,7 +89,7 @@ The first run will prompt for macOS notification permission — allow it.
 | Variable | Description |
 |---|---|
 | `CLAUDE_NOTIFIER_ACTIVATE_APP` | Override the terminal bundle ID (e.g., `com.googlecode.iterm2`) |
-| `CLAUDE_NOTIFIER_APP` | Override the app bundle path (default: `~/.claude/hooks/ClaudeNotifier.app`) |
+| `CLAUDE_NOTIFIER_APP` | Override the app bundle path |
 
 **Auto-detected terminals**
 
@@ -122,8 +133,8 @@ The notification subtitle shows the session's `customTitle` (from the Claude Cod
 ## Requirements
 
 - macOS 13 (Ventura) or later
-- Swift 5.9+ (included with Xcode 15+)
 - Claude Code
+- Swift 5.9+ (only for building from source)
 
 ## License
 
