@@ -47,8 +47,14 @@ fi
 mkdir -p "$INSTALL_DIR"
 rm -rf "$INSTALL_DIR/ClaudeNotifier.app"
 cp -R "$APP_SOURCE" "$INSTALL_DIR/"
-cp "$HOOK_SOURCE" "$INSTALL_DIR/notification.sh"
-chmod +x "$INSTALL_DIR/notification.sh"
+
+if [ -f "$INSTALL_DIR/notification.sh" ] && [ "${FORCE:-0}" != "1" ]; then
+    echo "Preserving existing $INSTALL_DIR/notification.sh (run with FORCE=1 to overwrite)"
+else
+    cp "$HOOK_SOURCE" "$INSTALL_DIR/notification.sh"
+    chmod +x "$INSTALL_DIR/notification.sh"
+    echo "Installed notification.sh"
+fi
 
 echo "Installed to $INSTALL_DIR"
 echo ""
