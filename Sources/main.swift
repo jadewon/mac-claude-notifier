@@ -28,8 +28,8 @@ class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCente
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if !hasInput {
-            activateTerminal()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { NSApp.terminate(nil) }
+            // No data — likely relaunched by macOS from notification center. Just exit.
+            DispatchQueue.main.async { NSApp.terminate(nil) }
             return
         }
 
