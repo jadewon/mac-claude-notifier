@@ -5,23 +5,49 @@ import UserNotifications
 var stdinJSON: [String: Any] = [:]
 var activateBundleID = "com.apple.Terminal"
 
+// Optional overrides from CLI — if provided, skip type-based fallback logic
+var overrideTitle: String?
+var overrideSubtitle: String?
+var overrideBody: String?
+var overrideSound: String?
+
 func parseArguments() {
     let args = CommandLine.arguments
-    if let i = args.firstIndex(of: "--data"), i + 1 < args.count {
-        let filePath = args[i + 1]
-        if let data = FileManager.default.contents(atPath: filePath),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            stdinJSON = json
+    var i = 1
+    while i < args.count {
+        let arg = args[i]
+        let next: String? = (i + 1 < args.count) ? args[i + 1] : nil
+
+        switch arg {
+        case "--data":
+            if let filePath = next {
+                if let data = FileManager.default.contents(atPath: filePath),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    stdinJSON = json
+                }
+                try? FileManager.default.removeItem(atPath: filePath)
+                i += 2
+                continue
+            }
+        case "--activate":
+            if let v = next { activateBundleID = v; i += 2; continue }
+        case "--title":
+            if let v = next { overrideTitle = v; i += 2; continue }
+        case "--subtitle":
+            if let v = next { overrideSubtitle = v; i += 2; continue }
+        case "--body":
+            if let v = next { overrideBody = v; i += 2; continue }
+        case "--sound":
+            if let v = next { overrideSound = v; i += 2; continue }
+        default:
+            break
         }
-        try? FileManager.default.removeItem(atPath: filePath)
-    }
-    if let i = args.firstIndex(of: "--activate"), i + 1 < args.count {
-        activateBundleID = args[i + 1]
+        i += 1
     }
 }
 
 parseArguments()
-let hasInput = !stdinJSON.isEmpty
+let hasInput = !stdinJSON.isEmpty || overrideBody != nil
 
 // MARK: - App Delegate
 class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -62,36 +88,41 @@ class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCente
     }
 
     func postNotification() {
+        // Fallback values from JSON + type-based switch (used if CLI overrides absent)
         let message = stdinJSON["message"] as? String ?? "Done"
-        let title = stdinJSON["title"] as? String
+        let jsonTitle = stdinJSON["title"] as? String
         let type = stdinJSON["notification_type"] as? String ?? "unknown"
         let cwd = stdinJSON["cwd"] as? String ?? ""
-
         let sessionLabel = readCustomTitle() ?? (cwd as NSString).lastPathComponent
 
-        var notiTitle: String
-        var soundName: String
-
+        var fallbackTitle: String
+        var fallbackSound: String
         switch type {
-        case "permission_prompt":  notiTitle = "🔐 Permission Required"; soundName = "Blow"
-        case "idle_prompt":        notiTitle = "💤 Waiting for Input";    soundName = "Tink"
-        case "auth_success":       notiTitle = "✅ Auth Complete";        soundName = "Glass"
-        case "elicitation_dialog": notiTitle = "💬 Input Needed";         soundName = "Blow"
-        default:                   notiTitle = "🤖 Claude Code";          soundName = "default"
+        case "permission_prompt":  fallbackTitle = "🔐 Permission Required"; fallbackSound = "Blow"
+        case "idle_prompt":        fallbackTitle = "💤 Waiting for Input";    fallbackSound = "Tink"
+        case "auth_success":       fallbackTitle = "✅ Auth Complete";        fallbackSound = "Glass"
+        case "elicitation_dialog": fallbackTitle = "💬 Input Needed";         fallbackSound = "Blow"
+        default:                   fallbackTitle = "🤖 Claude Code";          fallbackSound = "default"
         }
 
-        var subtitle = title ?? ""
+        var fallbackSubtitle = jsonTitle ?? ""
         if !sessionLabel.isEmpty {
-            subtitle = subtitle.isEmpty ? "[\(sessionLabel)]" : "[\(sessionLabel)] \(subtitle)"
+            fallbackSubtitle = fallbackSubtitle.isEmpty ? "[\(sessionLabel)]" : "[\(sessionLabel)] \(fallbackSubtitle)"
         }
+
+        // Apply CLI overrides where provided, fall back otherwise
+        let finalTitle = overrideTitle ?? fallbackTitle
+        let finalSubtitle = overrideSubtitle ?? fallbackSubtitle
+        let finalBody = overrideBody ?? message
+        let finalSound = overrideSound ?? fallbackSound
 
         let content = UNMutableNotificationContent()
-        content.title = notiTitle
-        content.subtitle = subtitle
-        content.body = message
-        content.sound = soundName == "default"
+        content.title = finalTitle
+        content.subtitle = finalSubtitle
+        content.body = finalBody
+        content.sound = finalSound == "default"
             ? UNNotificationSound.default
-            : UNNotificationSound(named: UNNotificationSoundName(soundName))
+            : UNNotificationSound(named: UNNotificationSoundName(finalSound))
 
         let request = UNNotificationRequest(
             identifier: "claude-\(UUID().uuidString)",

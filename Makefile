@@ -7,8 +7,9 @@ INSTALL_DIR = $(HOME)/.claude/hooks
 .PHONY: build install clean release
 
 build:
-	@mkdir -p $(APP_BUNDLE)/Contents/MacOS
+	@mkdir -p $(APP_BUNDLE)/Contents/MacOS $(APP_BUNDLE)/Contents/Resources
 	@sed 's/__VERSION__/$(VERSION)/g' Resources/Info.plist.template > $(APP_BUNDLE)/Contents/Info.plist
+	@cp Resources/AppIcon.icns $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
 	@swiftc Sources/main.swift \
 		-o $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME) \
 		-framework Cocoa \
