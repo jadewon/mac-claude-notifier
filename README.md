@@ -82,6 +82,44 @@ Same as Option B — installs to `~/.claude/hooks/` and prints the hook configur
 
 The first notification triggers a macOS permission prompt. Click **Allow** to enable notifications.
 
+## Customizing the notification
+
+To change the emoji, title, body, or sound, edit the `format_notification()` function at the top of your installed `notification.sh` — no rebuild required. Saving the file is enough; the next notification picks up the change.
+
+```bash
+format_notification() {
+    OUT_TITLE="🧑‍💼 인턴 개발자"
+    OUT_BODY="작업을 끝냈어요"
+    OUT_SOUND="Tink"
+
+    if [ -n "$SESSION_LABEL" ]; then
+        OUT_SUBTITLE="[$SESSION_LABEL]"
+    fi
+}
+```
+
+Available inputs inside the function:
+
+| Variable | Description |
+|---|---|
+| `$NOTI_TYPE` | `permission_prompt`, `idle_prompt`, `auth_success`, `elicitation_dialog`, or other |
+| `$NOTI_MESSAGE` | The message text from Claude Code |
+| `$NOTI_TITLE` | The title text from Claude Code (may be empty) |
+| `$SESSION_LABEL` | `customTitle` from the transcript, or the `cwd` folder name |
+
+Outputs (set any or all):
+
+| Variable | Description |
+|---|---|
+| `OUT_TITLE` | Top line of the notification |
+| `OUT_SUBTITLE` | Second line (optional) |
+| `OUT_BODY` | Main text |
+| `OUT_SOUND` | macOS sound name (`Blow`, `Tink`, `Glass`, `Funk`, `Ping`, `Pop`, `Purr`, `Sosumi`, `Submarine`, `Basso`, `Bottle`, `Frog`, `Hero`, `Morse`) or `default` |
+
+If `format_notification()` is absent, the Swift app falls back to `notification_type`-based built-in titles.
+
+> `make install` preserves an existing `notification.sh`. Use `make install-force` to overwrite customizations with the latest version from the repo.
+
 ## Configuration
 
 **Environment variables**
@@ -105,7 +143,9 @@ The terminal is detected automatically from `$TERM_PROGRAM`.
 | Alacritty | `alacritty` | `org.alacritty` |
 | Hyper | `Hyper` | `co.zeit.hyper` |
 
-**Notification types**
+**Default notification types (fallback)**
+
+These apply only when `format_notification()` does not set values.
 
 | Type | Title | Sound |
 |---|---|---|
@@ -129,6 +169,19 @@ Claude Code event
 ```
 
 The notification subtitle shows the session's `customTitle` (from the Claude Code transcript) if set, otherwise the project directory name.
+
+## Uninstall
+
+```bash
+# Homebrew
+brew uninstall mac-claude-notifier
+brew untap jadewon/tap
+
+# Manual / source install
+rm -rf ~/.claude/hooks/ClaudeNotifier.app ~/.claude/hooks/notification.sh
+```
+
+Then remove the `Notification` hook entry from `~/.claude/settings.json`. Optionally revoke notification permission in System Settings → Notifications → ClaudeNotifier.
 
 ## Requirements
 

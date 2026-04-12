@@ -129,4 +129,5 @@ After the user grants permission, confirm:
 Report to the user:
 - mac-claude-notifier is installed
 - Notifications will auto-detect their terminal app
-- They can customize behavior with environment variables (see README)
+- They can customize the notification appearance (emoji, title, body, sound) by editing the `format_notification()` function at the top of the installed `notification.sh` — no rebuild required
+- They can override the terminal target with the `CLAUDE_NOTIFIER_ACTIVATE_APP` environment variable (see README)
