@@ -35,6 +35,10 @@ if [ -d "$APP_BUNDLE" ]; then
     open -a "$APP_BUNDLE" --args --data "$TMPFILE" --activate "$BUNDLE_ID" &
 else
     # Fallback: osascript (click opens Script Editor)
-    MESSAGE=$(echo "$INPUT" | jq -r '.message // "Done"' | sed 's/\\/\\\\/g; s/"/\\"/g')
-    osascript -e "display notification \"$MESSAGE\" with title \"🤖 Claude Code\""
+    MESSAGE=$(echo "$INPUT" | jq -r '.message // "Done"')
+    osascript - "$MESSAGE" <<'APPLESCRIPT'
+on run argv
+    display notification (item 1 of argv) with title "🤖 Claude Code"
+end run
+APPLESCRIPT
 fi
