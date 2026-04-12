@@ -25,15 +25,16 @@ resolve_terminal_bundle_id() {
 }
 
 if [ -d "$APP_BUNDLE" ]; then
-    pkill -f "ClaudeNotifier" 2>/dev/null
+    killall ClaudeNotifier 2>/dev/null
 
     TMPFILE=$(mktemp /tmp/claude-noti-XXXXXX)
+    trap 'rm -f "$TMPFILE"' EXIT
     printf '%s' "$INPUT" > "$TMPFILE"
 
     BUNDLE_ID=$(resolve_terminal_bundle_id)
     open -a "$APP_BUNDLE" --args --data "$TMPFILE" --activate "$BUNDLE_ID" &
 else
     # Fallback: osascript (click opens Script Editor)
-    MESSAGE=$(echo "$INPUT" | jq -r '.message // "Done"')
+    MESSAGE=$(echo "$INPUT" | jq -r '.message // "Done"' | sed 's/\\/\\\\/g; s/"/\\"/g')
     osascript -e "display notification \"$MESSAGE\" with title \"🤖 Claude Code\""
 fi

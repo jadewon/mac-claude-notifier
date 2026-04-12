@@ -35,7 +35,13 @@ class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCente
 
         let center = UNUserNotificationCenter.current()
         center.delegate = self
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error = error {
+                FileHandle.standardError.write("ClaudeNotifier: authorization error: \(error.localizedDescription)\n".data(using: .utf8)!)
+            }
+            if !granted {
+                FileHandle.standardError.write("ClaudeNotifier: notification permission denied\n".data(using: .utf8)!)
+            }
             DispatchQueue.main.async { self.postNotification() }
         }
     }
@@ -83,10 +89,12 @@ class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCente
         content.title = notiTitle
         content.subtitle = subtitle
         content.body = message
-        content.sound = UNNotificationSound(named: UNNotificationSoundName(soundName))
+        content.sound = soundName == "default"
+            ? UNNotificationSound.default
+            : UNNotificationSound(named: UNNotificationSoundName(soundName))
 
         let request = UNNotificationRequest(
-            identifier: "claude-notification",
+            identifier: "claude-\(UUID().uuidString)",
             content: content,
             trigger: nil
         )
