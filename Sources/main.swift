@@ -53,14 +53,21 @@ let hasInput = !stdinJSON.isEmpty || overrideBody != nil
 class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Always set up the delegate — needed to handle notification clicks
+        // when macOS relaunches the app after it has exited.
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+
         if !hasInput {
-            // No data — likely relaunched by macOS from notification center. Just exit.
-            DispatchQueue.main.async { NSApp.terminate(nil) }
+            // Relaunched without data — could be a notification click (delegate will
+            // fire didReceive) or macOS housekeeping. Wait briefly; if no click
+            // arrives, exit silently.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                NSApp.terminate(nil)
+            }
             return
         }
 
-        let center = UNUserNotificationCenter.current()
-        center.delegate = self
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if let error = error {
                 FileHandle.standardError.write("ClaudeNotifier: authorization error: \(error.localizedDescription)\n".data(using: .utf8)!)
