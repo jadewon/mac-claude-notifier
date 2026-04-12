@@ -27,8 +27,9 @@ resolve_terminal_bundle_id() {
 if [ -d "$APP_BUNDLE" ]; then
     killall ClaudeNotifier 2>/dev/null
 
+    # Temp file is cleaned up by the Swift app after reading.
+    # Don't add an EXIT trap — the shell exits before `open -a` reads the file.
     TMPFILE=$(mktemp /tmp/claude-noti-XXXXXX)
-    trap 'rm -f "$TMPFILE"' EXIT
     printf '%s' "$INPUT" > "$TMPFILE"
 
     BUNDLE_ID=$(resolve_terminal_bundle_id)
