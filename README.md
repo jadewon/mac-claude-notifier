@@ -22,14 +22,21 @@ This project is a lightweight replacement built on Apple's modern `UNUserNotific
 
 ## Quick Start
 
-**Option A — Download from GitHub Releases**
+**Option A — Homebrew**
+
+```bash
+brew tap jadewon/tap
+brew install mac-claude-notifier
+```
+
+**Option B — Download from GitHub Releases**
 
 ```bash
 # Download and unzip the latest release from GitHub Releases, then:
 make install
 ```
 
-**Option B — Build from source**
+**Option C — Build from source**
 
 ```bash
 git clone https://github.com/jadewon/mac-claude-notifier.git
@@ -56,6 +63,8 @@ make install
   }
 }
 ```
+
+If installed via Homebrew, use `"command": "$(brew --prefix)/bin/notification.sh"` instead.
 
 The first run will prompt for macOS notification permission — allow it.
 
