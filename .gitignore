@@ -1,0 +1,15 @@
+# Build output
+build/
+*.app
+*.zip
+*.dmg
+
+# macOS
+.DS_Store
+*.swp
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
