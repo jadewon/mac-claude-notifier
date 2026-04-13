@@ -146,6 +146,16 @@ After the user confirms they enabled it, re-run the test notification from Step 
 
 Ask the user to click the test notification and confirm that it activated their terminal app.
 
+**If the user is on iTerm2**, the first click will also show an Automation permission prompt:
+
+> "ClaudeNotifier" wants access to control "iTerm".
+
+Tell the user:
+
+> "Please click **OK** to allow this. It enables notifications to jump to the exact tab that triggered them. You can revoke it later in System Settings → Privacy & Security → Automation."
+
+Without this permission, clicking still activates iTerm2 but does not switch tabs.
+
 ## Done
 
 Report to the user:

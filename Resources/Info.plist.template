@@ -18,5 +18,7 @@
     <string>AppIcon</string>
     <key>LSUIElement</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>ClaudeNotifier uses AppleScript to switch to the terminal tab that triggered the notification.</string>
 </dict>
 </plist>

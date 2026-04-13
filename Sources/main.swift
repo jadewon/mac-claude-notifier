@@ -4,6 +4,7 @@ import UserNotifications
 // MARK: - Parse CLI arguments
 var stdinJSON: [String: Any] = [:]
 var activateBundleID = "com.apple.Terminal"
+var itermSessionUUID: String?
 
 // Optional overrides from CLI — if provided, skip type-based fallback logic
 var overrideTitle: String?
@@ -31,6 +32,8 @@ func parseArguments() {
             }
         case "--activate":
             if let v = next { activateBundleID = v; i += 2; continue }
+        case "--iterm-session":
+            if let v = next { itermSessionUUID = v; i += 2; continue }
         case "--title":
             if let v = next { overrideTitle = v; i += 2; continue }
         case "--subtitle":
@@ -131,6 +134,11 @@ class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCente
             ? UNNotificationSound.default
             : UNNotificationSound(named: UNNotificationSoundName(finalSound))
 
+        // Embed activation info so notification clicks can restore it on app relaunch
+        var userInfo: [String: Any] = ["bundleID": activateBundleID]
+        if let uuid = itermSessionUUID { userInfo["itermSessionUUID"] = uuid }
+        content.userInfo = userInfo
+
         let request = UNNotificationRequest(
             identifier: "claude-\(UUID().uuidString)",
             content: content,
@@ -147,6 +155,14 @@ class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCente
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
+        // Recover activation info from userInfo (CLI args aren't re-passed on relaunch)
+        let userInfo = response.notification.request.content.userInfo
+        if let bundleID = userInfo["bundleID"] as? String {
+            activateBundleID = bundleID
+        }
+        if let uuid = userInfo["itermSessionUUID"] as? String {
+            itermSessionUUID = uuid
+        }
         activateTerminal()
         completionHandler()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { NSApp.terminate(nil) }
@@ -159,9 +175,46 @@ class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCente
     }
 
     func activateTerminal() {
+        // If an iTerm2 session UUID was provided, try to select that specific
+        // session/tab via AppleScript. Fall back to plain app activation on failure.
+        if activateBundleID == "com.googlecode.iterm2", let uuid = itermSessionUUID {
+            if selectITermSession(uuid: uuid) {
+                return
+            }
+        }
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: activateBundleID) {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
         }
+    }
+
+    func selectITermSession(uuid: String) -> Bool {
+        let script = """
+        tell application "iTerm2"
+            activate
+            repeat with aWindow in windows
+                repeat with aTab in tabs of aWindow
+                    repeat with aSession in sessions of aTab
+                        if unique id of aSession is "\(uuid)" then
+                            tell aTab to select
+                            return true
+                        end if
+                    end repeat
+                end repeat
+            end repeat
+            return false
+        end tell
+        """
+        var error: NSDictionary?
+        if let appleScript = NSAppleScript(source: script) {
+            let result = appleScript.executeAndReturnError(&error)
+            if error == nil && result.booleanValue {
+                return true
+            }
+            if let err = error {
+                FileHandle.standardError.write("ClaudeNotifier: iTerm AppleScript error: \(err)\n".data(using: .utf8)!)
+            }
+        }
+        return false
     }
 }
 

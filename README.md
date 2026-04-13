@@ -17,6 +17,7 @@ This project is a lightweight replacement built on Apple's modern `UNUserNotific
 |---|---|---|---|
 | macOS API | AppleScript bridge | NSUserNotification (deprecated) | UNUserNotificationCenter |
 | Click action | Opens Script Editor | Configurable (`-activate`) | Auto-detects terminal |
+| iTerm2 per-tab activation | No | No | Yes (jumps to exact tab) |
 | Custom sound | Manual | Single sound | Per notification type |
 | Session label | No | No | Session title or project name |
 | Maintained | Apple built-in | Last release 2017 | Active |
@@ -107,6 +108,16 @@ open -a ~/.claude/hooks/ClaudeNotifier.app --args --data "$TMPFILE"
 
 After this, ClaudeNotifier will appear in System Settings → Notifications.
 
+### Automation permission (iTerm2 only)
+
+When running inside iTerm2, clicking a notification switches to the **exact tab** that triggered it — not just the iTerm2 app. The first time this happens, macOS shows a prompt:
+
+> **"ClaudeNotifier" wants access to control "iTerm".**
+
+Click **OK** to allow it. Without this permission the notification still works, but clicking only activates iTerm2 and does not switch tabs.
+
+You can review or revoke this permission later in **System Settings → Privacy & Security → Automation → ClaudeNotifier → iTerm**.
+
 ## Customizing the notification
 
 To change the emoji, title, body, or sound, edit the `format_notification()` function at the top of your installed `notification.sh` — no rebuild required. Saving the file is enough; the next notification picks up the change.
@@ -186,14 +197,18 @@ These apply only when `format_notification()` does not set values.
 Claude Code event
   → Notification hook triggers notification.sh
     → Reads JSON from stdin, detects terminal via TERM_PROGRAM
+    → Captures ITERM_SESSION_ID (if running inside iTerm2)
       → Writes JSON to temp file (macOS `open` can't pipe stdin)
-        → `open -a ClaudeNotifier.app --args --data /tmp/... --activate <bundleID>`
+        → `open -a ClaudeNotifier.app --args --data /tmp/... --activate <bundleID> --iterm-session <uuid>`
           → UNUserNotificationCenter posts native notification
-            → Click → NSWorkspace activates your terminal
+            → Click (iTerm2): AppleScript selects the exact tab via unique id
+            → Click (other terminals): NSWorkspace activates the app
               → App auto-exits after 60s
 ```
 
 The notification subtitle shows the session's `customTitle` (from the Claude Code transcript) if set, otherwise the project directory name.
+
+The `ITERM_SESSION_ID` environment variable is exported by iTerm2 and inherited through the Claude Code process tree down to the hook script. Its UUID portion matches iTerm2's AppleScript `unique id` of the session, which makes per-tab activation possible without any iTerm2-specific plumbing in Claude Code.
 
 ## Uninstall
 

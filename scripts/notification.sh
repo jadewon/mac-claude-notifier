@@ -117,12 +117,19 @@ if [ -d "$APP_BUNDLE" ]; then
 
     BUNDLE_ID=$(resolve_terminal_bundle_id)
 
+    # Extract iTerm2 session UUID (format: w0t10p1:UUID) for per-tab activation
+    ITERM_UUID=""
+    if [ -n "$ITERM_SESSION_ID" ]; then
+        ITERM_UUID="${ITERM_SESSION_ID#*:}"
+    fi
+
     # Build CLI args — only pass overrides that are set
     ARGS=(--data "$TMPFILE" --activate "$BUNDLE_ID")
     [ -n "$OUT_TITLE" ]    && ARGS+=(--title    "$OUT_TITLE")
     [ -n "$OUT_SUBTITLE" ] && ARGS+=(--subtitle "$OUT_SUBTITLE")
     [ -n "$OUT_BODY" ]     && ARGS+=(--body     "$OUT_BODY")
     [ -n "$OUT_SOUND" ]    && ARGS+=(--sound    "$OUT_SOUND")
+    [ -n "$ITERM_UUID" ]   && ARGS+=(--iterm-session "$ITERM_UUID")
 
     open -a "$APP_BUNDLE" --args "${ARGS[@]}" &
 else
