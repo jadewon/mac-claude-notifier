@@ -17,7 +17,7 @@ This project is a lightweight replacement built on Apple's modern `UNUserNotific
 |---|---|---|---|
 | macOS API | AppleScript bridge | NSUserNotification (deprecated) | UNUserNotificationCenter |
 | Click action | Opens Script Editor | Configurable (`-activate`) | Auto-detects terminal |
-| iTerm2 per-tab activation | No | No | Yes (jumps to exact tab) |
+| iTerm2 / Herdr per-tab activation | No | No | Yes (jumps to exact tab) |
 | Custom sound | Manual | Single sound | Per notification type |
 | Session label | No | No | Session title or project name |
 | Maintained | Apple built-in | Last release 2017 | Active |
@@ -167,7 +167,7 @@ If `format_notification()` is absent, the Swift app falls back to `notification_
 
 **Auto-detected terminals**
 
-The terminal is detected automatically from `$TERM_PROGRAM`.
+The terminal is detected automatically, in this order: the first UI `.app` found by walking up the hook's parent processes (background-only helpers with `LSUIElement`/`LSBackgroundOnly` are skipped), the tmux client's parent processes, `$__CFBundleIdentifier`, then `$TERM_PROGRAM` as a fallback.
 
 | Terminal | TERM_PROGRAM | Bundle ID |
 |---|---|---|
@@ -196,12 +196,14 @@ These apply only when `format_notification()` does not set values.
 ```
 Claude Code event
   → Notification hook triggers notification.sh
-    → Reads JSON from stdin, detects terminal via TERM_PROGRAM
+    → Reads JSON from stdin, detects terminal bundle ID (process tree, then env)
     → Captures ITERM_SESSION_ID (if running inside iTerm2)
+    → Captures HC_TERMINAL_ID and the herdr-app path (if running inside Herdr)
       → Writes JSON to temp file (macOS `open` can't pipe stdin)
         → `open -a ClaudeNotifier.app --args --data /tmp/... --activate <bundleID> --iterm-session <uuid>`
           → UNUserNotificationCenter posts native notification
             → Click (iTerm2): AppleScript selects the exact tab via unique id
+            → Click (Herdr): activates Herdr, then `herdr-app do agent.focus --terminal <id>` shows that agent's space, tab and pane
             → Click (other terminals): NSWorkspace activates the app
               → App auto-exits after 60s
 ```
@@ -209,6 +211,8 @@ Claude Code event
 The notification subtitle shows the session's `customTitle` (from the Claude Code transcript) if set, otherwise the project directory name.
 
 The `ITERM_SESSION_ID` environment variable is exported by iTerm2 and inherited through the Claude Code process tree down to the hook script. Its UUID portion matches iTerm2's AppleScript `unique id` of the session, which makes per-tab activation possible without any iTerm2-specific plumbing in Claude Code.
+
+Herdr exports `HC_TERMINAL_ID` (the terminal address, e.g. `t7`) to the programs it runs. The hook passes it with the absolute path of `herdr-app` (found on `PATH`); the click runs `herdr-app do agent.focus`, which asks the open Herdr window to show that agent. If `herdr-app` is not on `PATH`, the click only activates Herdr.
 
 ## Uninstall
 

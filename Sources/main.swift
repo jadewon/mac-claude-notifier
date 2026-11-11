@@ -5,6 +5,11 @@ import UserNotifications
 var stdinJSON: [String: Any] = [:]
 var activateBundleID = "com.apple.Terminal"
 var itermSessionUUID: String?
+var tmuxBin: String?
+var tmuxSocket: String?
+var tmuxPane: String?
+var herdrBin: String?
+var herdrTerminal: String?
 
 // Optional overrides from CLI — if provided, skip type-based fallback logic
 var overrideTitle: String?
@@ -34,6 +39,16 @@ func parseArguments() {
             if let v = next { activateBundleID = v; i += 2; continue }
         case "--iterm-session":
             if let v = next { itermSessionUUID = v; i += 2; continue }
+        case "--tmux-bin":
+            if let v = next { tmuxBin = v; i += 2; continue }
+        case "--tmux-socket":
+            if let v = next { tmuxSocket = v; i += 2; continue }
+        case "--tmux-pane":
+            if let v = next { tmuxPane = v; i += 2; continue }
+        case "--herdr-bin":
+            if let v = next { herdrBin = v; i += 2; continue }
+        case "--herdr-terminal":
+            if let v = next { herdrTerminal = v; i += 2; continue }
         case "--title":
             if let v = next { overrideTitle = v; i += 2; continue }
         case "--subtitle":
@@ -137,6 +152,11 @@ class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCente
         // Embed activation info so notification clicks can restore it on app relaunch
         var userInfo: [String: Any] = ["bundleID": activateBundleID]
         if let uuid = itermSessionUUID { userInfo["itermSessionUUID"] = uuid }
+        if let bin = tmuxBin       { userInfo["tmuxBin"]    = bin }
+        if let sock = tmuxSocket   { userInfo["tmuxSocket"] = sock }
+        if let pane = tmuxPane     { userInfo["tmuxPane"]   = pane }
+        if let bin = herdrBin      { userInfo["herdrBin"]      = bin }
+        if let t = herdrTerminal   { userInfo["herdrTerminal"] = t }
         content.userInfo = userInfo
 
         let request = UNNotificationRequest(
@@ -163,6 +183,11 @@ class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCente
         if let uuid = userInfo["itermSessionUUID"] as? String {
             itermSessionUUID = uuid
         }
+        if let bin = userInfo["tmuxBin"] as? String       { tmuxBin = bin }
+        if let sock = userInfo["tmuxSocket"] as? String   { tmuxSocket = sock }
+        if let pane = userInfo["tmuxPane"] as? String     { tmuxPane = pane }
+        if let bin = userInfo["herdrBin"] as? String      { herdrBin = bin }
+        if let t = userInfo["herdrTerminal"] as? String   { herdrTerminal = t }
         activateTerminal()
         completionHandler()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { NSApp.terminate(nil) }
@@ -175,15 +200,36 @@ class NotifierDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCente
     }
 
     func activateTerminal() {
-        // If an iTerm2 session UUID was provided, try to select that specific
-        // session/tab via AppleScript. Fall back to plain app activation on failure.
+        var didSelectITerm = false
         if activateBundleID == "com.googlecode.iterm2", let uuid = itermSessionUUID {
-            if selectITermSession(uuid: uuid) {
-                return
+            didSelectITerm = selectITermSession(uuid: uuid)
+        }
+        if !didSelectITerm {
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: activateBundleID) {
+                NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
             }
         }
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: activateBundleID) {
-            NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+
+        // After the terminal app is frontmost, jump tmux to the originating
+        // session/window/pane in one shot. switch-client accepts a pane target.
+        if let bin = tmuxBin, let sock = tmuxSocket, let pane = tmuxPane {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                let p = Process()
+                p.executableURL = URL(fileURLWithPath: bin)
+                p.arguments = ["-S", sock, "switch-client", "-t", pane]
+                try? p.run()
+            }
+        }
+
+        // Herdr: show the originating agent's space, tab and pane. `herdr-app do`
+        // talks to the running window over its socket; it does not open a new one.
+        if let bin = herdrBin, let terminal = herdrTerminal {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                let p = Process()
+                p.executableURL = URL(fileURLWithPath: bin)
+                p.arguments = ["do", "agent.focus", "--terminal", terminal]
+                try? p.run()
+            }
         }
     }
 

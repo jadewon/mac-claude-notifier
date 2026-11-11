@@ -11,10 +11,71 @@
 APP_BUNDLE="${CLAUDE_NOTIFIER_APP:-$HOME/.claude/hooks/ClaudeNotifier.app}"
 INPUT=$(cat)
 
-# Resolve terminal bundle ID: env override > TERM_PROGRAM auto-detect > default
+# Walk a process tree upward looking for a *.app/Contents/MacOS/* executable,
+# then read its CFBundleIdentifier. Echoes the bundle ID and returns 0 on hit.
+# Skips background-only apps (LSUIElement / LSBackgroundOnly = 1/true): they
+# have no window to bring forward, so keep walking toward the real UI app.
+_walk_to_bundle_id() {
+    local pid="$1"
+    local exe app bid key flag skip
+    while [ -n "$pid" ] && [ "$pid" != "1" ]; do
+        exe=$(ps -o comm= -p "$pid" 2>/dev/null)
+        case "$exe" in
+            *.app/Contents/MacOS/*)
+                app="${exe%/Contents/MacOS/*}"
+                skip=0
+                for key in LSUIElement LSBackgroundOnly; do
+                    flag=$(defaults read "$app/Contents/Info" "$key" 2>/dev/null)
+                    case "$flag" in
+                        1|[Tt][Rr][Uu][Ee]|[Yy][Ee][Ss]) skip=1 ;;
+                    esac
+                done
+                if [ "$skip" = "1" ]; then
+                    pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+                    continue
+                fi
+                bid=$(defaults read "$app/Contents/Info" CFBundleIdentifier 2>/dev/null)
+                if [ -n "$bid" ]; then
+                    echo "$bid"
+                    return 0
+                fi
+                ;;
+        esac
+        pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+    done
+    return 1
+}
+
+# Resolve the terminal bundle ID. Strategy:
+#   1. CLAUDE_NOTIFIER_ACTIVATE_APP env override
+#   2. Walk parent process tree from this hook (works for cmux, Superset,
+#      ghostty, iTerm, Terminal.app, ...). Robust against $TERM_PROGRAM
+#      spoofing — Superset claims "kitty", cmux claims "ghostty".
+#      Background-only helper apps (LSUIElement / LSBackgroundOnly) are
+#      skipped, e.g. Herdr's "Herdr Core" helper (dev.herdr.core).
+#   3. Inside tmux, the hook's parents detour to a detached server. Use the
+#      tmux client PID and walk from there.
+#   4. $__CFBundleIdentifier, which LaunchServices sets to the launching app's
+#      bundle ID and children inherit. Covers terminals whose shells run under
+#      a detached helper re-parented to launchd, so the UI app is not an
+#      ancestor (Herdr: shells under "Herdr Core", env says dev.herdr.app).
+#   5. Legacy $TERM_PROGRAM mapping as last-resort fallback.
 resolve_terminal_bundle_id() {
     if [ -n "$CLAUDE_NOTIFIER_ACTIVATE_APP" ]; then
         echo "$CLAUDE_NOTIFIER_ACTIVATE_APP"
+        return
+    fi
+
+    _walk_to_bundle_id "$$" && return
+
+    if [ -n "${TMUX:-}" ] && command -v tmux >/dev/null 2>&1; then
+        local cpid
+        cpid=$(tmux list-clients -F '#{client_pid}' 2>/dev/null | head -1)
+        [ -n "$cpid" ] && _walk_to_bundle_id "$cpid" && return
+    fi
+
+    if [ -n "${__CFBundleIdentifier:-}" ]; then
+        echo "$__CFBundleIdentifier"
         return
     fi
 
@@ -123,6 +184,30 @@ if [ -d "$APP_BUNDLE" ]; then
         ITERM_UUID="${ITERM_SESSION_ID#*:}"
     fi
 
+    # Capture tmux target so the click handler can `tmux switch-client` back
+    # to the exact session/window/pane that triggered this notification.
+    TMUX_BIN=""
+    TMUX_SOCKET=""
+    TMUX_PANE_ID=""
+    if [ -n "${TMUX:-}" ] && [ -n "${TMUX_PANE:-}" ]; then
+        TMUX_BIN=$(command -v tmux 2>/dev/null)
+        if [ -n "$TMUX_BIN" ]; then
+            TMUX_SOCKET="${TMUX%%,*}"
+            TMUX_PANE_ID="$TMUX_PANE"
+        fi
+    fi
+
+    # Capture the Herdr terminal so the click handler can run
+    # `herdr-app do agent.focus --terminal <id>`, which shows that agent's
+    # space, tab and pane in the open Herdr window. The absolute path is needed
+    # because the Swift app is started by `open` and does not get this PATH.
+    HERDR_BIN=""
+    HERDR_TERMINAL=""
+    if [ -n "${HC_TERMINAL_ID:-}" ]; then
+        HERDR_BIN=$(command -v herdr-app 2>/dev/null)
+        [ -n "$HERDR_BIN" ] && HERDR_TERMINAL="$HC_TERMINAL_ID"
+    fi
+
     # Build CLI args — only pass overrides that are set
     ARGS=(--data "$TMPFILE" --activate "$BUNDLE_ID")
     [ -n "$OUT_TITLE" ]    && ARGS+=(--title    "$OUT_TITLE")
@@ -130,6 +215,8 @@ if [ -d "$APP_BUNDLE" ]; then
     [ -n "$OUT_BODY" ]     && ARGS+=(--body     "$OUT_BODY")
     [ -n "$OUT_SOUND" ]    && ARGS+=(--sound    "$OUT_SOUND")
     [ -n "$ITERM_UUID" ]   && ARGS+=(--iterm-session "$ITERM_UUID")
+    [ -n "$TMUX_PANE_ID" ] && ARGS+=(--tmux-bin "$TMUX_BIN" --tmux-socket "$TMUX_SOCKET" --tmux-pane "$TMUX_PANE_ID")
+    [ -n "$HERDR_TERMINAL" ] && ARGS+=(--herdr-bin "$HERDR_BIN" --herdr-terminal "$HERDR_TERMINAL")
 
     open -a "$APP_BUNDLE" --args "${ARGS[@]}" &
 else
