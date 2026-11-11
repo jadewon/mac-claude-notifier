@@ -17,7 +17,7 @@ This project is a lightweight replacement built on Apple's modern `UNUserNotific
 |---|---|---|---|
 | macOS API | AppleScript bridge | NSUserNotification (deprecated) | UNUserNotificationCenter |
 | Click action | Opens Script Editor | Configurable (`-activate`) | Auto-detects terminal |
-| iTerm2 / Herdr per-tab activation | No | No | Yes (jumps to exact tab) |
+| iTerm2 / Herdr / tmux per-tab activation | No | No | Yes (jumps to exact tab or pane) |
 | Custom sound | Manual | Single sound | Per notification type |
 | Session label | No | No | Session title or project name |
 | Maintained | Apple built-in | Last release 2017 | Active |
@@ -178,6 +178,7 @@ The terminal is detected automatically, in this order: the first UI `.app` found
 | Ghostty | `ghostty` | `com.mitchellh.ghostty` |
 | Alacritty | `alacritty` | `org.alacritty` |
 | Hyper | `Hyper` | `co.zeit.hyper` |
+| Herdr | (not used; detected via `$__CFBundleIdentifier`) | `dev.herdr.app` |
 
 **Default notification types (fallback)**
 
@@ -199,11 +200,13 @@ Claude Code event
     → Reads JSON from stdin, detects terminal bundle ID (process tree, then env)
     → Captures ITERM_SESSION_ID (if running inside iTerm2)
     → Captures HC_TERMINAL_ID and the herdr-app path (if running inside Herdr)
+    → Captures the tmux binary, socket and TMUX_PANE (if running inside tmux)
       → Writes JSON to temp file (macOS `open` can't pipe stdin)
-        → `open -a ClaudeNotifier.app --args --data /tmp/... --activate <bundleID> --iterm-session <uuid>`
+        → `open -a ClaudeNotifier.app --args --data /tmp/... --activate <bundleID> [--iterm-session <uuid>] [--herdr-bin <path> --herdr-terminal <id>] [--tmux-bin <path> --tmux-socket <sock> --tmux-pane <pane>]`
           → UNUserNotificationCenter posts native notification
             → Click (iTerm2): AppleScript selects the exact tab via unique id
             → Click (Herdr): activates Herdr, then `herdr-app do agent.focus --terminal <id>` shows that agent's space, tab and pane
+            → Click (tmux): after activating the terminal, `tmux -S <sock> switch-client -t <pane>` jumps to the originating pane
             → Click (other terminals): NSWorkspace activates the app
               → App auto-exits after 60s
 ```
